@@ -1,5 +1,6 @@
 # ---------- 系统常量定义 ---------- 
 import sys
+import math
 
 # 存储系统参数
 FRE_PER_SLICING = 1800            # 时间片频率
@@ -85,14 +86,25 @@ def do_object_write(object_unit, disk_unit, size, object_id):
     # 2. 保证写入指定大小的连续空间
     # 3. 使用断言保证写入成功
     current_write_point = 0
-    for i in range(1, V + 1):
+    i = 1
+    while True:
         if disk_unit[i] == 0:
             disk_unit[i] = object_id
             current_write_point += 1
             object_unit[current_write_point] = i
             if current_write_point == size:
                 break
+        else:
+            i = (i + size*current_write_point) % V + 1
     assert (current_write_point == size)
+    # for i in range(1, V + 1):
+    #     if disk_unit[i] == 0:
+    #         disk_unit[i] = object_id
+    #         current_write_point += 1
+    #         object_unit[current_write_point] = i
+    #         if current_write_point == size:
+    #             break
+    # assert (current_write_point == size)
 
 def write_action():
     """处理写入指令（包含副本分配逻辑）"""
@@ -100,13 +112,27 @@ def write_action():
     # 使用 (object_id + j) % N + 1 决定副本分布
     # 输出格式：
     # 对象ID + 副本磁盘号 + 各副本存储位置
+    warning_storage = V/10
     n_write = int(input())
     for i in range(1, n_write + 1):
         write_input = input().split()
         write_id = int(write_input[0])
         size = int(write_input[1])
+        tag = int(write_input[2])
         objects[write_id].lastRequestPoint = 0
         for j in range(1, REP_NUM + 1):
+            load_balance_factor = 0
+            while True:
+                remained_size = disk[(write_id + j + load_balance_factor) % N + 1].count(0)
+                if remained_size < warning_storage:
+                    load_balance_factor += 1
+                else:
+                    break
+                if load_balance_factor >= N:
+                    load_balance_factor = 0
+                    warning_storage = warning_storage/2
+
+            # objects[write_id].replica[j] = ((tag +  (size-3)*(size-3)) + load_balance_factor + j) % N + 1 # add tag
             objects[write_id].replica[j] = (write_id + j) % N + 1
             objects[write_id].unit[j] = [0 for _ in range(size + 1)]
             objects[write_id].size = size
@@ -147,12 +173,29 @@ def read_action():
     else:
         current_phase += 1
         objectId = req_object_ids[current_request]
+
         for i in range(1, N + 1):
             if i == objects[objectId].replica[1]:
                 if current_phase % 2 == 1:
-                    print(f"j {objects[objectId].unit[1][int(current_phase / 2 + 1)]}")
+                    destination = objects[objectId].unit[1][int(current_phase / 2 + 1)]
+                    if destination >= disk_point[i]:
+                        step = destination - disk_point[i]
+                    else:
+                        step = V - disk_point[i] + destination  
+                    if step < G:
+                        if G - step > 64:
+                            print("p"*step+"r#")
+                            disk_point[i] = (destination + 1) % V
+                            current_phase += 1
+                        else:
+                            print("p"*step+"#")
+                            disk_point[i] = destination
+                    else:
+                        print(f"j {destination}")
+                        disk_point[i] = destination
                 else:
                     print("r#")
+                    disk_point[i] = (disk_point[i] + 1 ) % V
             else:
                 print("#")
         if current_phase == objects[objectId].size * 2:
