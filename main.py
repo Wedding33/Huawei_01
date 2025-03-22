@@ -1,49 +1,58 @@
+# ---------- 系统常量定义 ---------- 
 import sys
 
-FRE_PER_SLICING = 1800
-MAX_DISK_NUM = (10 + 1)
-MAX_DISK_SIZE = (16384 + 1)
-MAX_REQUEST_NUM = (30000000 + 1)
-MAX_OBJECT_NUM = (100000 + 1)
-REP_NUM = 3
-EXTRA_TIME = 105
+# 存储系统参数
+FRE_PER_SLICING = 1800            # 时间片频率
+MAX_DISK_NUM = (10 + 1)          # 最大磁盘数量（包含索引偏移）
+MAX_DISK_SIZE = (16384 + 1)       # 单盘最大容量（包含索引偏移）
+MAX_REQUEST_NUM = (30000000 + 1)  # 最大请求数量
+MAX_OBJECT_NUM = (100000 + 1)     # 最大对象数量
+REP_NUM = 3                      # 每个对象的副本数
+EXTRA_TIME = 105                  # 额外运行时间片
 
-disk = [[0 for _ in range(MAX_DISK_SIZE)] for _ in range(MAX_DISK_NUM)]
-disk_point = [0 for _ in range(MAX_DISK_NUM)]
-_id = [0 for _ in range(MAX_OBJECT_NUM)]
+# ---------- 存储系统数据结构 ----------
+disk = [[0 for _ in range(MAX_DISK_SIZE)] for _ in range(MAX_DISK_NUM)]  # 磁盘存储空间（二维数组）
+disk_point = [0 for _ in range(MAX_DISK_NUM)]  # 磁盘当前写入位置指针
+_id = [0 for _ in range(MAX_OBJECT_NUM)]       # 临时ID存储数组
 
-current_request = 0
-current_phase = 0
+# 请求状态跟踪
+current_request = 0   # 当前处理的请求ID
+current_phase = 0     # 当前请求处理阶段
 
-
+# ---------- 对象存储结构 ----------
 class Object:
     def __init__(self):
-        self.replica = [0 for _ in range(REP_NUM + 1)]
-        self.unit = [[] for _ in range(REP_NUM + 1)]
-        self.size = 0
-        self.lastRequestPoint = 0
-        self.isDelete = False
+        self.replica = [0 for _ in range(REP_NUM + 1)]  # 副本所在的磁盘ID（索引从1开始）
+        self.unit = [[] for _ in range(REP_NUM + 1)]    # 每个副本在磁盘中的存储位置 
+        self.size = 0               # 对象大小
+        self.lastRequestPoint = 0   # 最后关联的请求ID
+        self.isDelete = False       # 删除标记
 
+# 请求追踪数据结构
+req_object_ids = [0] * MAX_REQUEST_NUM  # 请求对应的对象ID
+req_prev_ids = [0] * MAX_REQUEST_NUM     # 前驱请求ID（用于构建请求链）
+req_is_dones = [False] * MAX_REQUEST_NUM # 请求完成状态
 
-req_object_ids = [0] * MAX_REQUEST_NUM
-req_prev_ids = [0] * MAX_REQUEST_NUM
-req_is_dones = [False] * MAX_REQUEST_NUM
+objects = [Object() for _ in range(MAX_OBJECT_NUM)]  # 对象实例数组
 
-objects = [Object() for _ in range(MAX_OBJECT_NUM)]
-
-
+# ---------- 核心功能函数 ----------
 def do_object_delete(object_unit, disk_unit, size):
+    """执行对象删除操作（实际是将存储位置置零）"""
     for i in range(1, size + 1):
         disk_unit[object_unit[i]] = 0
 
-
 def timestamp_action():
+    """处理时间戳指令"""
     timestamp = input().split()[1]
     print(f"TIMESTAMP {timestamp}")
     sys.stdout.flush()
 
-
 def delete_action():
+    """处理删除指令（包含事务回滚逻辑）"""
+    # 主要功能：
+    # 1. 统计需要中止的请求
+    # 2. 执行实际删除操作
+    # 3. 更新对象删除状态
     n_delete = int(input())
     abortNum = 0
     for i in range(1, n_delete + 1):
@@ -69,8 +78,12 @@ def delete_action():
         objects[delete_id].isDelete = True
     sys.stdout.flush()
 
-
 def do_object_write(object_unit, disk_unit, size, object_id):
+    """执行对象写入操作（寻找空闲位置存储）"""
+    # 实现策略：
+    # 1. 顺序查找磁盘空闲位置
+    # 2. 保证写入指定大小的连续空间
+    # 3. 使用断言保证写入成功
     current_write_point = 0
     for i in range(1, V + 1):
         if disk_unit[i] == 0:
@@ -81,8 +94,12 @@ def do_object_write(object_unit, disk_unit, size, object_id):
                 break
     assert (current_write_point == size)
 
-
 def write_action():
+    """处理写入指令（包含副本分配逻辑）"""
+    # 副本分配策略：
+    # 使用 (object_id + j) % N + 1 决定副本分布
+    # 输出格式：
+    # 对象ID + 副本磁盘号 + 各副本存储位置
     n_write = int(input())
     for i in range(1, n_write + 1):
         write_input = input().split()
@@ -103,8 +120,12 @@ def write_action():
             print()
     sys.stdout.flush()
 
-
 def read_action():
+    """处理读取请求（带状态机实现）"""
+    # 副本分配策略：
+    # 使用 (object_id + j) % N + 1 决定副本分布
+    # 输出格式：
+    # 对象ID + 副本磁盘号 + 各副本存储位置
     request_id = 0
     nRead = int(input())
     for i in range(1, nRead + 1):
@@ -146,27 +167,34 @@ def read_action():
             print("0")
     sys.stdout.flush()
 
-
+# ---------- 辅助函数 ----------
 def print_next(message):
+    """连续打印辅助函数（避免自动换行）"""
     print(f"{message}", end="")
 
-
+# ---------- 主程序流程 ----------
 if __name__ == '__main__':
+    # 初始化参数
     user_input = input().split()
-    T = int(user_input[0])
-    M = int(user_input[1])
-    N = int(user_input[2])
-    V = int(user_input[3])
-    G = int(user_input[4])
-    # skip preprocessing
+    T = int(user_input[0])  # 总运行时间片
+    M = int(user_input[1])  # 参数M（具体含义需结合题目）
+    N = int(user_input[2])  # 磁盘数量
+    V = int(user_input[3])  # 单盘容量
+    G = int(user_input[4])  # 参数G（具体含义需结合题目）
+
+    # 跳过预处理阶段
     for item in range(1, M * 3 + 1):
         input()
     print("OK")
     sys.stdout.flush()
+
+    # 初始化磁盘指针
     for item in range(1, N + 1):
-        disk_point[item] = 1
+        disk_point[item] = 1  # 初始化每个磁盘的写入位置
+
+    # 主事件循环
     for item in range(1, T + EXTRA_TIME + 1):
-        timestamp_action()
-        delete_action()
-        write_action()
-        read_action()
+        timestamp_action()  # 处理时间戳
+        delete_action()     # 处理删除操作
+        write_action()      # 处理写入操作
+        read_action()       # 处理读取操作
