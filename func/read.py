@@ -6,8 +6,8 @@ def scan_and_read_disk(manager: Manager):
     finished_reqests = []
     for disk in manager.disks:
         path, reqs = disk.scan_and_read()
-        finished_reqests.extend(reqs)
-        print(path)
+        # finished_reqests.extend(reqs)
+        print("#")
     return finished_reqests
 
 @print_function_time

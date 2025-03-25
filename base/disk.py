@@ -89,6 +89,9 @@ class Disk:
 
         total_path = ''
         finished_list = []
+
+        return total_path, finished_list
+
         while self.tokens_left > 0:
             # NOTE: find a readable block
             path = self.move_to_readable_block()
