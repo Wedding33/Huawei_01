@@ -9,7 +9,9 @@ EXTRA_TIME = 105
 
 REQUEST_ABANDON_THRESHOLD = 10
 
-DEBUG = False
+# DEBUG_INFO = []
+DEBUG_INFO = ["others"]
+# DEBUG_INFO = ["disk", "object", "others"]
 DEBUG_TIMESTAMP = None
 OBJECT_OUTPUT_PATH = "./output/object_info.txt"
 DISK_OUTPUT_PATH = "./output/disk_info.txt"

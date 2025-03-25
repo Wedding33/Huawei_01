@@ -1,7 +1,7 @@
 from base.manager import *
 from .utils import *
 
-@print_function_time
+# @print_function_time
 def scan_and_read_disk(manager: Manager):
     finished_reqests = []
     for disk in manager.disks:
@@ -19,6 +19,9 @@ def read_action(manager: Manager):
         req_id = int(read_input[0])
         object = manager.get_object(int(read_input[1]))
         object.register_request(req_id)
+
+    if any(info in DEBUG_INFO for info in ["object", "disk"]):
+        manager.print_debug_info()
 
     # NOTE: process requests
     finish_list = scan_and_read_disk(manager)

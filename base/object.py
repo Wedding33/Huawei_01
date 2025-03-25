@@ -12,6 +12,10 @@ class Request:
     
     def is_done(self):
         return self.size_to_read == 0
+    
+    def is_out_of_time(self):
+        return timer.time() - self.timestamp >= EXTRA_TIME
+    
 
 class Block:
     def __init__(self, object_id):
@@ -21,7 +25,10 @@ class Block:
         self.units: List[Unit] = []
 
     def is_requested(self):
-        return len(self.requests) > 0
+        for req in self.requests.values():
+            if not req.is_out_of_time():
+                return True
+        return False
     
     def add_unit(self, unit):
         self.units.append(unit)
@@ -65,6 +72,7 @@ class Object:
         self.size = size
         self.blocks = [Block(object_id) for _ in range(size)]
         self.tag = tag
+        self.timeout_requests = []
 
         self.record = {'write': [], 'delete': [], 'read': [], 'disk': {}}
 
@@ -82,20 +90,35 @@ class Object:
                 unit.block = None
                 unit.object_id = 0
 
-    def get_ongoing_requests(self):
+    def get_ongoing_requests(self, id_only=False):
         # NOTE: get ongoing requests
         request = set()
         for block in self.blocks:
-            request = request.union(block.requests.keys())
+            request = request.union(block.requests.keys() if id_only else block.requests.values())
         return list(request)
+    
+    def get_all_requests(self):
+        # NOTE: get all requests, including timeout requests
+        return self.get_ongoing_requests(id_only=True) + self.timeout_requests
+    
+    def clear_timeout_requests(self):
+        reqs = self.get_ongoing_requests(id_only=False)
+        keys = []
+        for req in reqs:
+            if req.is_out_of_time():
+                keys.append(req.id)
+        self.timeout_requests.extend(keys)
+        for key in keys:
+            for block in self.blocks:
+                block.requests.pop(key, None)
 
     def delete(self):   
         # NOTE: get ongoing requests
-        request = self.get_ongoing_requests()
+        request = self.get_all_requests()
         # NOTE: unregister units
         self.unregister_units()
         self.record['delete'].append(timer.time())
-        return list(request)
+        return request
 
 
     def register_request(self, request_id):

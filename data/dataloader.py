@@ -154,8 +154,13 @@ class Data:
         plt.show()
 
     def show_statistic(self):
+        total_sizes, average_sizes = {}, {}
         for tag, info in self.statistic.items():
-            print(f'tag {tag}: ', info['size'])
+            sizes = info['size']
+            total_sizes[tag] = sum([sizes[s] * s for s in sizes])
+            average_sizes[tag] = total_sizes[tag] / sum([sizes[s] for s in sizes])
+            print(f'tag {tag}: ', sizes, f'(total: {total_sizes[tag]} average: {average_sizes[tag]: .2f})')
+        print(f'total: {sum(total_sizes.values())}')
 
         data = []
         sizes = set()
@@ -216,8 +221,9 @@ class Data:
         plt.tight_layout()
         plt.show()
 
+
 data = Data()
 data.show_time_varience()
-data.show_read_total()
-data.show_write_total()
+# data.show_read_total()
+# data.show_write_total()
 data.show_statistic()
