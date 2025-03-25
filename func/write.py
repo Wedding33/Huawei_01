@@ -22,7 +22,7 @@ def select_disk_unit(manager: Manager, object: Object):
 def select_unit(disk, size):
     return select_unit_demo(disk, size)
 
-@print_function_time
+# @print_function_time
 def print_write_info(units_list: List[List[Unit]]):
     info = f"{units_list[0][0].object_id}\n"
     for units in units_list:
@@ -46,8 +46,12 @@ def write_action(manager: Manager):
         units_list = select_disk_unit(manager, object)
 
         object.register_units(units_list)
-        manager.register_object(object)
+        manager.register_object_and_disk(object, units_list)
         
+        if any(info in DEBUG_INFO for info in ["object", "disk"]):
+            manager.print_debug_info()
+            
         print_write_info(units_list)
+
 
     flush()
