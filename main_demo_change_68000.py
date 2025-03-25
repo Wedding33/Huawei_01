@@ -215,6 +215,7 @@ def read_action():
                             disk_point[disk_id] = destination
                             req["phases"][j] += 1
                             token -= step
+                            disk_pre_token[i] = 64
                         else:
                             # token 不足，走部分步长后退出
                             disk_output += "p" * token
@@ -222,11 +223,12 @@ def read_action():
                             if disk_point[disk_id] == 0:
                                 disk_point[disk_id] += 1
                             token = 0
+                            disk_pre_token[i] = 64
                     else:
                         # 读取阶段
                         if token < disk_pre_token[disk_id]:
                             # token不足以处理当前读取步长，输出占位符并退出
-                            disk_output += "#"
+                            # disk_output += "#"
                             token = 0
                         else:
                             disk_output += "r"
