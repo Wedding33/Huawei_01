@@ -3,12 +3,14 @@ from .object import *
 from .disk import *
 from typing import List
 from queue import Queue
-    
+
+
 class Manager:
     def __init__(self):
         # NOTE: start from 1
         self.disks: List[Disk] = [Disk(i, args.V, args.G) for i in range(1, args.N + 1)]
         self.objects: Dict[int, Object] = {}
+        self.work_queue: Queue = Queue(maxsize=EXTRA_TIME)
 
         # FIXME: add effective requests queue
         self.timestamp = 0
@@ -28,9 +30,20 @@ class Manager:
         # return obj
         return self.objects.pop(i)
     
+    def recycle_units(self, obj: Object):
+        disk_unit_dict = obj.get_recycle_pos()
+        for disk_id, unit_id in disk_unit_dict.items():
+            self.get_disk(disk_id).recycle_unit(unit_id, obj.size)
+
+    def register_requests(self, requests: List[Request]):
+        self.work_queue.put(requests)
+        
     def clear_timeout_requests(self):
-        for obj in self.objects.values():
-            obj.clear_timeout_requests()
+        if self.work_queue.full():
+            timeout_requests: List[Request] = self.work_queue.get()
+            for req in timeout_requests:
+                if (not req.is_done()) and (req.object_id in self.objects):
+                    self.get_object(req.object_id).move_timeout_request(req)
     
     def register_object_and_disk(self, object: Object, unit_list: List[List[Unit]]):
         self.objects[object.id] = object

@@ -1,9 +1,11 @@
 from .config import *
 from typing import List, Dict
+from func.utils import print_function_time
 
 class Request:
-    def __init__(self, idx, size):
+    def __init__(self, idx, obj_id, size):
         self.id = idx
+        self.object_id = obj_id
         self.size_to_read = size
         self.timestamp = timer.time()
 
@@ -63,7 +65,8 @@ class Unit:
         self.block = block
         self.block.add_unit(self)
 
-    def read(self):
+    def read(self) -> List[int]:
+        """ return finished request id list """
         return self.block.read()
 
 class Object:
@@ -101,16 +104,10 @@ class Object:
         # NOTE: get all requests, including timeout requests
         return self.get_ongoing_requests(id_only=True) + self.timeout_requests
     
-    def clear_timeout_requests(self):
-        reqs = self.get_ongoing_requests(id_only=False)
-        keys = []
-        for req in reqs:
-            if req.is_out_of_time():
-                keys.append(req.id)
-        self.timeout_requests.extend(keys)
-        for key in keys:
-            for block in self.blocks:
-                block.requests.pop(key, None)
+    def move_timeout_request(self, request: Request):
+        for block in self.blocks:
+            block.requests.pop(request.id, None)
+        self.timeout_requests.append(request.id)
 
     def delete(self):   
         # NOTE: get ongoing requests
@@ -119,11 +116,14 @@ class Object:
         self.unregister_units()
         self.record['delete'].append(timer.time())
         return request
-
+    
+    def get_recycle_pos(self):
+        return {unit.disk_id: unit.id for unit in self.blocks[0].units}
 
     def register_request(self, request_id):
         # NOTE: register request
-        request = Request(request_id, self.size)
+        request = Request(request_id, self.id, self.size)
         for block in self.blocks:
             block.requests[request_id] = request
         self.record['read'].append(timer.time())
+        return request

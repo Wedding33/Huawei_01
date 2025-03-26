@@ -15,6 +15,7 @@ def timestamp_action(manager: Manager):
     sys.stdout.flush()
 
     manager.clear_timeout_requests()
+    
     if "others" in DEBUG_INFO:
         with open(OTHER_OUTPUT_PATH, 'a') as f:
             f.write(f"------ TIMESTAMP {timestamp} ------\n")

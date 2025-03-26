@@ -9,15 +9,15 @@ EXTRA_TIME = 105
 
 REQUEST_ABANDON_THRESHOLD = 10
 
-# DEBUG_INFO = []
-DEBUG_INFO = ["others"]
+DEBUG_INFO = []
+# DEBUG_INFO = ["others"]
 # DEBUG_INFO = ["disk", "object", "others"]
 DEBUG_TIMESTAMP = None
 OBJECT_OUTPUT_PATH = "./output/object_info.txt"
 DISK_OUTPUT_PATH = "./output/disk_info.txt"
 OTHER_OUTPUT_PATH = "./output/others.txt"
 
-TIME_MONITOR = True
+TIME_MONITOR = False
 TIME_MONITOR_PATH = "./output/time.txt"
 
 # TODO

@@ -14,26 +14,30 @@ def select_unit_demo(disk: Disk, size: int):
     assert len(units) == size
     return units
 
+# @print_function_time
 def select_disk_unit(manager: Manager, object: Object):
     disks = [manager.get_disk(disk_id) for disk_id in select_disk_demo(object)]
-    units_list = [select_unit_demo(disk, object.size) for disk in disks]
+    units_list = [select_unit(disk, object.size) for disk in disks]
     return units_list    # REP_NUM * size
 
-def select_unit(disk, size):
-    return select_unit_demo(disk, size)
+def select_unit(disk: Disk, size):
+    units = disk.find_n_empty_units(size)
+    assert (units is not None) and (len(units) == size)
+    return units
 
 # @print_function_time
-def print_write_info(units_list: List[List[Unit]]):
+def get_write_info(units_list: List[List[Unit]]):
     info = f"{units_list[0][0].object_id}\n"
     for units in units_list:
         info += f"{units[0].disk_id}"
         for unit in units:
             info += f" {unit.id}"
         info += "\n"
-    print(info.strip())
+    return info.strip()
 
-@print_function_time
-def write_action(manager: Manager):    
+# @print_function_time
+def write_action(manager: Manager):  
+    info = []  
     n_write = int(input())
     for _ in range(n_write):
         write_input = input().split()
@@ -51,7 +55,8 @@ def write_action(manager: Manager):
         if any(info in DEBUG_INFO for info in ["object", "disk"]):
             manager.print_debug_info()
             
-        print_write_info(units_list)
+        info.append(get_write_info(units_list))
 
-
+    if n_write > 0:    
+        print('\n'.join(info))
     flush()

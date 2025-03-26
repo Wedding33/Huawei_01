@@ -20,6 +20,9 @@ def score_func(x, size):
     g_size = (size + 1) * 0.5
     return f_x * g_size
 
+def value_per_size(size):
+    return (size + 1) * 0.5 / size
+
 def print_function_time(func):
     def wrapper(*args, **kwargs):
         start_time = get_realtime()

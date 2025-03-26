@@ -4,11 +4,23 @@ from typing import List
 from math import ceil
 from func.utils import print_function_time
 
-CONT_READ_TOKENS = [64, 52, 42, 34, 28, 23, 19, 16]
-
 # TODO
 class Sector:   # disk sector for picking valuable blocks
     pass
+
+class SortList(list):
+    def append_ascending(self, item):
+        left, right = 0, len(self) - 1
+        while left <= right:
+            mid = (left + right) // 2
+            if self[mid] == item:
+                left = right = mid
+                break
+            elif self[mid] < item:
+                left = mid + 1
+            else:
+                right = mid - 1
+        self.insert(left, item)
 
 
 class Disk:
@@ -16,12 +28,16 @@ class Disk:
         self.id = idx
         self.disk_size = disk_size
         self.data: List[Unit] = [Unit(i + 1, idx) for i in range(disk_size)]
+
         self.point = 1
         self.pre_token = None    # token for last operation
         self.max_token  = max_token  # max token for each phase
         self.tokens_left = 0  # tokens left for current phase
         self.continuously_read = False
         self.max_written_pos = 0
+
+        self.max_obj_size = 5
+        self.delete_record = {s: SortList() for s in range(1, self.max_obj_size + 1)}
         # self.mode = 'scan'
 
     def register_max_written_pos(self, units: List[Unit]):
@@ -50,6 +66,50 @@ class Disk:
             self.continuously_read = False
         self.point = unit_id
 
+    def recycle_unit(self, unit_id, size):
+        if size > self.max_obj_size:
+            for s in range(self.max_obj_size + 1, size + 1):
+                self.delete_record[s] = []
+            self.max_obj_size = size
+        self.delete_record[size].append_ascending(unit_id)
+
+    def reuse_n_units(self, n, separate=False):
+        if not separate:
+            for size in range(n, self.max_obj_size + 1):  # FIXME: consider the case that size > 5 (NOTE: the size is not too large)
+                if len(self.delete_record[size]) > 0:
+                    start_pos = self.delete_record[size].pop(0)
+                    units = [self.get_unit(i) for i in range(start_pos, start_pos + n)]
+                    if size != n:
+                        self.delete_record[size - n].append_ascending(start_pos + n)
+                    return units
+        else:
+            unit_size = []
+            sizes = {s: len(self.delete_record[s]) for s in self.delete_record.keys() if (s < n) and len(self.delete_record[s]) > 0}
+            while n > 0:
+                max_size = max(sizes.keys())
+                sizes[max_size] -= 1
+                if sizes[max_size] == 0:
+                    sizes.pop(max_size)
+                unit_size.append(max_size)
+                n -= max_size
+                if (sizes == {}) or (min(sizes.keys() > n)):
+                    return None
+            units = []
+            for size in unit_size:  # FIXME: consider the case that size > 5 (NOTE: the size is not too large)
+                units.extend(self.reuse_n_units(size, separate=False))
+            return units
+        
+    def find_n_empty_units(self, n):
+        units = self.reuse_n_units(n, separate=False)
+        if units is not None:
+            return units
+        if self.max_written_pos + n <= self.disk_size:
+            start_pos = self.max_written_pos + 1
+            units = [self.get_unit(i) for i in range(start_pos, start_pos + n)]
+            return units
+        return self.reuse_n_units(n, separate=True)
+
+        
     def register_object(self, object: Object):
         for block in object.blocks:
             for unit in self.data:
@@ -102,7 +162,6 @@ class Disk:
             self.continuously_read = True
             return 'r', finished_list
     
-    # @print_function_time
     def scan_and_read(self):
         # reset tokens at the beginning of each round
         self.tokens_left = self.max_token
@@ -114,7 +173,7 @@ class Disk:
                 # NOTE: find a readable block
                 path = self.move_to_readable_block()
                 total_path += path
-                if self.unit_is_requested(self.point):
+                while self.unit_is_requested(self.point) and self.tokens_left > 0:
                     read_path, finished = self.read_once()
                     total_path += read_path
                     finished_list.extend(finished)

@@ -2,13 +2,14 @@ from base.manager import *
 from .utils import *
 
 
-@print_function_time
+# @print_function_time
 def delete_action(manager: Manager):
     n_delete = int(input())
     delete_list = [int(input()) for _ in range(n_delete)]
     abort_list = []
     for object_id in delete_list:
         object = manager.pop_object(object_id)
+        manager.recycle_units(object)
         assert object is not None
         abort_list.extend(object.delete())
     abort_num = len(abort_list)
