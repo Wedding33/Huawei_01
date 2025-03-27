@@ -1,9 +1,10 @@
 from .config import *
 from .object import *
-from typing import List
-from math import ceil, floor
-from func.utils import print_function_time
+from .prob import Prob
 from .path import read_instead_of_pass, cal_read_tokens
+from typing import List
+from math import floor
+from func.utils import print_function_time
 
 class SortList(list):
     def append_ascending(self, item):
@@ -60,21 +61,21 @@ class Section:   # disk section for picking valuable blocks
             return None
         else:
             unit_size = []
+            n_size = n
             sizes = {s: len(self.delete_record[s]) for s in self.delete_record.keys() if (s < n) and len(self.delete_record[s]) > 0}
-            while (n > 0) and (len(sizes.keys()) > 0):
-                if len(sizes.keys()) == 0:
+            while (n > 0):
+                if len(sizes.keys()) == 0 or min(sizes.keys()) > n:
                     return None
-                max_size = max(sizes.keys())
+                max_size = max([k for k in sizes.keys() if k <= n])
                 sizes[max_size] -= 1
                 if sizes[max_size] == 0:
                     sizes.pop(max_size)
                 unit_size.append(max_size)
                 n -= max_size
-                if min(sizes.keys()) > n:
-                    return None
             units = []
             for size in unit_size:
                 units.extend(self.reuse_n_units(size, separate=False))
+            assert len(units) == n_size, f'{len(units)} vs {n_size}, unit_size={unit_size}, sizes={sizes}'
             return units
 
     def find_n_empty_units(self, n):
@@ -108,9 +109,9 @@ class Disk:
         # self.max_read = max_token // 16
         self.tokens_left = 0  # tokens left for current phase
         self.max_written_pos = 0
-
         self.max_obj_size = 5
 
+        self.prob = None
         # self.mode = 'scan'
 
     def get_section(self, tag: int) -> Section: 
@@ -167,7 +168,8 @@ class Disk:
             self.pre_token = None
             self.point = unit_id
 
-
+    def register_prob(self, prob: Prob):
+        self.prob = prob
         
     def register_object(self, object: Object):
         for block in object.blocks:
@@ -216,7 +218,8 @@ class Disk:
             self.tokens_left = 0
             # FIXME:FIXME
             # pos = self.sections[timer.get_section_id() - 1].start_pos
-            pos = 1
+            # pos = 1
+            pos = self.get_section(self.prob.choose_tag()).start_pos
             self.jump_to(pos)
             return f'j {pos}', 0
         else:

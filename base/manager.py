@@ -1,6 +1,7 @@
 from .config import *
 from .object import *
 from .disk import *
+from .prob import *
 from typing import List
 from queue import Queue
 
@@ -14,7 +15,6 @@ class Manager:
 
         # FIXME: add effective requests queue
         self.timestamp = 0
-        self.prob = None    # asssigned by 'preprocess', length is num_slices
         self.tag_count = {i: 0 for i in range(1, args.M + 1)}
 
 
@@ -55,6 +55,12 @@ class Manager:
         for units in unit_list:
             disk = self.get_disk(units[0].disk_id)
             disk.register_max_written_pos(units)
+
+    def register_prob(self, obj_num_list, read_list):
+        prob = Prob(obj_num_list, read_list)
+        for disk in self.disks:
+            disk.register_prob(prob)
+
 
     def print_debug_info(self):
         list2str = lambda x: '[' + ', '.join(str(item) for item in x) + ']'
@@ -103,22 +109,3 @@ class Manager:
 
             with open(DISK_OUTPUT_PATH, 'w') as file:
                 print(json.dumps(disk_info, indent=4), file=file)
-"""
-    # for prob-based algorithms
-    def init_prob(self, del_list, write_list, read_list):
-        lengths = [len(ls) for ls in (del_list + write_list + read_list)]
-        assert all([length == lengths[0] for length in lengths])
-        num_tags = [len(lols) for lols in [del_list, write_list, read_list]]
-        assert all([num_tag == num_tags[0] for num_tag in num_tags])
-        num_slices, num_tags = lengths[0], num_tags[0]
-        del_slices = list(zip(*del_list))
-        write_slices = list(zip(*write_list))
-        read_slices = list(zip(*read_list))
-        # self.prob = [PhaseProb(i, num_tags, ds, ws, rs) for i, (ds, ws, rs) in enumerate(zip(del_slices, write_slices, read_slices))]
-
-    def find_slice(self, timestamp):
-        return timestamp // FRE_PER_SLICING
-
-    def get_tags_count(self):
-        pass
-"""

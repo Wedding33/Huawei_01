@@ -12,8 +12,8 @@ MAX_READ_INSTEAD = 0
 SEARCH_DEVISION = 10
 MAX_OBJECT_SIZE = 5
 # FIXME:FIXME
-# PROPORTION = [i for i in [0.24, 0.19, 0.20, 0.11, 0.13, 0.13]]
-PROPORTION = [1.]
+PROPORTION = [i for i in [0.24, 0.19, 0.20, 0.11, 0.13, 0.13]]
+# PROPORTION = [1.]
 SECTION_MAP = {}
 section_id_map = {
     1: [1, 15, 16],
@@ -26,7 +26,7 @@ section_id_map = {
 for i in range(1, 7):
     SECTION_MAP = {**SECTION_MAP, **{j: i for j in section_id_map[i]}}
 # FIXME:FIXME
-SECTION_MAP = {i: 1 for i in range(1, 17)}
+# SECTION_MAP = {i: 1 for i in range(1, 17)}
 
 DEBUG_INFO = []
 # DEBUG_INFO = ["others"]
@@ -59,6 +59,7 @@ class Config:
         self.N = int(user_input[2])     # {N} disks, [3, 10]
         self.V = int(user_input[3])     # {V} units, [1, 16384]
         self.G = int(user_input[4])     # {G} tokens, [64, 1000]
+        self.num_slice = self.T // FRE_PER_SLICING + (1 if self.T % FRE_PER_SLICING != 0 else 0)
     
 
 args = Config()
@@ -73,11 +74,14 @@ class Timer:
     def time(self):
         return self.timestamp
     
+    def time_phase(self):
+        return self.timestamp / FRE_PER_SLICING
+    
     def set_time(self, time):
         self.timestamp = int(time)
 
     def get_section_id(self):
-        return self.section_order[self.timestamp // (1800 * 5)]
+        return self.section_order[self.timestamp // (FRE_PER_SLICING * 5)]
 
 
 timer = Timer()

@@ -23,9 +23,9 @@ def select_disk_unit(manager: Manager, object: Object):
             continue
         units_list.append(units)
         if len(units_list) == REP_NUM:
-            manager.tag_count[object.tag] += 3
+            manager.tag_count[object.tag] += REP_NUM
             break
-    assert len(units_list) == REP_NUM
+    assert len(units_list) == REP_NUM and all(len(units) == object.size for units in units_list), [[unit.id for unit in units] for units in units_list]
     return units_list    # REP_NUM * size
 
 
@@ -50,9 +50,8 @@ def write_action(manager: Manager):
         tag = int(write_input[2])
         object = Object(object_id, size, tag)
 
-        # FIXME:FIXME: use 'select_disk_unit' instead of 'select_disk_unit_v3'
-        # units_list = select_disk_unit(manager, object)
-        units_list = select_disk_unit_v3(manager, object)
+        units_list = select_disk_unit(manager, object)
+        # units_list = select_disk_unit_v3(manager, object)
 
         object.register_units(units_list)
         manager.register_object_and_disk(object, units_list)
