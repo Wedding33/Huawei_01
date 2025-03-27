@@ -1,7 +1,7 @@
 from base.manager import *
 from .utils import print_function_time, flush
 
-@print_function_time
+# @print_function_time
 def preprocess(manager: Manager):
     del_list = [input().split() for _ in range(args.M)]
     write_list = [input().split() for _ in range(args.M)]

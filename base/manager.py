@@ -15,6 +15,8 @@ class Manager:
         # FIXME: add effective requests queue
         self.timestamp = 0
         self.prob = None    # asssigned by 'preprocess', length is num_slices
+        self.tag_count = {i: 0 for i in range(1, args.M + 1)}
+
 
         # auxiliary data
     def get_disk(self, i: int) -> Disk:
@@ -32,17 +34,20 @@ class Manager:
     
     def recycle_units(self, obj: Object):
         disk_unit_dict = obj.get_recycle_pos()
-        for disk_id, unit_id in disk_unit_dict.items():
-            self.get_disk(disk_id).recycle_unit(unit_id, obj.size)
+        for disk_id, unit_id_size_dict in disk_unit_dict.items():
+            for unit_id, size in unit_id_size_dict.items():
+                self.get_disk(disk_id).get_section(obj.tag).recycle_unit(unit_id, size)
 
+    # @print_function_time
     def register_requests(self, requests: List[Request]):
         self.work_queue.put(requests)
-        
+    
+    # @print_function_time
     def clear_timeout_requests(self):
         if self.work_queue.full():
             timeout_requests: List[Request] = self.work_queue.get()
             for req in timeout_requests:
-                if (not req.is_done()) and (req.object_id in self.objects):
+                if req.is_on_going():
                     self.get_object(req.object_id).move_timeout_request(req)
     
     def register_object_and_disk(self, object: Object, unit_list: List[List[Unit]]):
@@ -87,7 +92,6 @@ class Manager:
                         'max_written_pos': f'{disk.max_written_pos}',
                         'pre_token': f'{disk.pre_token}',
                         'tokens_left': f'{disk.tokens_left}',
-                        'continuous': f'{disk.continuously_read}',
                         'unit_info': [
                             f'uid: {unit.id}, obj_id: {unit.object_id}, req_ids: {list2str(unit.block.requests.keys())}'
                             for unit in disk.data if unit.is_requested()

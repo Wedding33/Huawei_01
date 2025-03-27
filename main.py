@@ -1,25 +1,8 @@
-import sys
+from func.timestamp import *
 from func.delete import *
 from func.write import *
 from func.read import *
 from func.process import *
-if "others" in DEBUG_INFO:
-    import psutil
-    process = psutil.Process()
-
-@print_function_time
-def timestamp_action(manager: Manager):
-    timestamp = int(input().split()[1])
-    timer.set_time(timestamp)   # for debug
-    print(f"TIMESTAMP {timestamp}")
-    sys.stdout.flush()
-
-    manager.clear_timeout_requests()
-    
-    if "others" in DEBUG_INFO:
-        with open(OTHER_OUTPUT_PATH, 'a') as f:
-            f.write(f"------ TIMESTAMP {timestamp} ------\n")
-            f.write(f"Memory used: {process.memory_info().rss / 1024**3:.4f} GB\n")
 
 
 if __name__ == '__main__':

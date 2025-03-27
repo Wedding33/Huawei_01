@@ -1,9 +1,11 @@
 data/sample_practice.in
 data/sample.in
+output
 replay
 result.txt
 main.zip
 interactor
 debug.txt
+test.py
 main_algorithm
 __pycache__

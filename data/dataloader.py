@@ -29,7 +29,26 @@ class Data:
         for i in range(self.M):
             self.draw_data[i]['ratio'] = [(r / t) for r, t in zip(self.draw_data[i]['read'], self.draw_data[i]['total'])]
 
-        self.statistic = {i: {'id': [], 'size': {}} for i in range(1, self.M + 1)}
+        self.draw_data = [None] + self.draw_data
+        self.draw_data[0] = {
+            key: [sum([self.draw_data[j][key][i] for j in range(1, self.M + 1)]) for i in range(self.slice_num)]
+            for key in self.draw_data[1].keys()
+        }
+
+        section_map = {
+            1: [1, 15, 16],
+            2: [2, 3, 5],
+            3: [6, 7, 8],
+            4: [12, 13],
+            5: [9, 10, 11],
+            6: [4, 14],
+        }
+        inverse_map = dict()
+        for i in range(1, 7):
+            inverse_map = {**inverse_map, **{j: i for j in section_map[i]}}
+
+        # self.statistic = {i: {'id': [], 'size': {}} for i in range(1, self.M + 1)}
+        self.statistic = {i: {'id': [], 'size': {}} for i in range(1, 7)}
         data = ''.join(file.readlines()).split('TIMESTAMP')[1:]
         data = [d.split('\n')[1:] for d in data]
         for d in data:
@@ -41,12 +60,14 @@ class Data:
                 n_write -= 1
                 info = d[pos].strip().split()
                 obj_id, obj_size, tag = int(info[0]), int(info[1]), int(info[2])
+                tag = inverse_map[tag]
                 self.statistic[tag]['id'].append(obj_id)
                 if obj_size not in self.statistic[tag]['size']:
                     self.statistic[tag]['size'][obj_size] = 1
                 else:
                     self.statistic[tag]['size'][obj_size] += 1
                 pos += 1
+        self.statistic_total_size = {i: {'size': {size: self.statistic[i]['size'][size] * size for size in self.statistic[i]['size']} } for i in range(1, 7)}
 
 
     def show_time_varience(self):
@@ -66,7 +87,7 @@ class Data:
                     line, = ax.plot(draw_data[i][key], label=key)
                     lines.append(line)
                 ax.set_ylabel('Delete, Write, Total')
-                ax.set_title(f'Data {i + 1}')
+                ax.set_title(f'Data {i}' if i > 0 else 'Sum')
 
                 # 创建第二个坐标轴
                 ax2 = ax.twinx()
@@ -83,11 +104,19 @@ class Data:
             plt.show()
 
         metrics = ['delete', 'write', 'read', 'total', 'ratio']
+        types = {'large': {}, 'small': {}}
+        for i in range(1, len(draw_data)):
+            if draw_data[i]['write'][0] > 750:
+                types['large'][i] = draw_data[i]['write'][0]
+            else:
+                types['small'][i] = draw_data[i]['write'][0]
+        print(types)
+        
         # 为每个指标创建一个单独的图形
         for metric in metrics:
             plt.figure(figsize=(10, 6))
             for i in range(len(draw_data)):
-                plt.plot(draw_data[i][metric], label=f'Data {i + 1}')
+                plt.plot(draw_data[i][metric], label=f'Data {i}' if i > 0 else 'Sum')
 
             plt.title(f'{metric.capitalize()} Time Variance')
             plt.xlabel('Time Slices')
@@ -159,12 +188,13 @@ class Data:
             sizes = info['size']
             total_sizes[tag] = sum([sizes[s] * s for s in sizes])
             average_sizes[tag] = total_sizes[tag] / sum([sizes[s] for s in sizes])
-            print(f'tag {tag}: ', sizes, f'(total: {total_sizes[tag]} average: {average_sizes[tag]: .2f})')
+        for tag, info in self.statistic.items():
+            print(f'tag {tag}: ', sizes, f'(total: {total_sizes[tag]} proportion: {total_sizes[tag] / sum(total_sizes.values())}, average: {average_sizes[tag]: .2f})')
         print(f'total: {sum(total_sizes.values())}')
 
         data = []
         sizes = set()
-        for tag, info in self.statistic.items():
+        for tag, info in self.statistic_total_size.items():
             size_counts = info['size']
             row = {'tag': tag}
             for size, count in size_counts.items():
@@ -223,7 +253,7 @@ class Data:
 
 
 data = Data()
-data.show_time_varience()
+# data.show_time_varience()
 # data.show_read_total()
 # data.show_write_total()
 data.show_statistic()

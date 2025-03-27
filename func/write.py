@@ -1,29 +1,33 @@
 from base.manager import *
 from .utils import *
 
-def select_disk_demo(object: Object):
+def select_disk(manager: Manager, object: Object):
     return [(object.id + j) % args.N + 1 for j in range(1, REP_NUM + 1)]
-
-def select_unit_demo(disk: Disk, size: int):
-    units = []
-    for i in range(1, 1 + args.V):
-        if disk.unit_is_empty(i):
-            units.append(disk.get_unit(i))
-        if len(units) == size:
-            break
-    assert len(units) == size
+def select_unit(disk: Disk, size, tag):
+    units = disk.get_section(tag).find_n_empty_units(size)
+    assert (units is not None) and (len(units) == size)
     return units
 
 # @print_function_time
-def select_disk_unit(manager: Manager, object: Object):
-    disks = [manager.get_disk(disk_id) for disk_id in select_disk_demo(object)]
-    units_list = [select_unit(disk, object.size) for disk in disks]
+def select_disk_unit_v3(manager: Manager, object: Object):
+    disks = [manager.get_disk(disk_id) for disk_id in select_disk(manager, object)]
+    units_list = [select_unit(disk, object.size, object.tag) for disk in disks]
     return units_list    # REP_NUM * size
 
-def select_unit(disk: Disk, size):
-    units = disk.find_n_empty_units(size)
-    assert (units is not None) and (len(units) == size)
-    return units
+def select_disk_unit(manager: Manager, object: Object):
+    units_list = []
+    for i in range(args.N):
+        disk_id = (manager.tag_count[object.tag] + i) % args.N + 1
+        units = manager.get_disk(disk_id).get_section(object.tag).find_n_empty_units(object.size)
+        if units is None:
+            continue
+        units_list.append(units)
+        if len(units_list) == REP_NUM:
+            manager.tag_count[object.tag] += 3
+            break
+    assert len(units_list) == REP_NUM
+    return units_list    # REP_NUM * size
+
 
 # @print_function_time
 def get_write_info(units_list: List[List[Unit]]):
@@ -46,13 +50,14 @@ def write_action(manager: Manager):
         tag = int(write_input[2])
         object = Object(object_id, size, tag)
 
-        # TODO: design a function to select disk and unit
-        units_list = select_disk_unit(manager, object)
+        # FIXME:FIXME: use 'select_disk_unit' instead of 'select_disk_unit_v3'
+        # units_list = select_disk_unit(manager, object)
+        units_list = select_disk_unit_v3(manager, object)
 
         object.register_units(units_list)
         manager.register_object_and_disk(object, units_list)
         
-        if any(info in DEBUG_INFO for info in ["object", "disk"]):
+        if any(info in DEBUG_INFO for info in ["object", "disk"]) and DEBUG_TIMESTAMP in [None, timer.time()]:
             manager.print_debug_info()
             
         info.append(get_write_info(units_list))
