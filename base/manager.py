@@ -33,16 +33,18 @@ class Manager:
         return self.objects.pop(i)
     
     def recycle_units(self, obj: Object):
-        disk_unit_dict = obj.get_recycle_pos()
-        for disk_id, unit_id_size_dict in disk_unit_dict.items():
+        disk_unit_dict, rep_id_dict = obj.get_recycle_pos()
+        for rep_id, (disk_id, unit_id_size_dict) in zip(rep_id_dict.values(), disk_unit_dict.items()):
             for unit_id, size in unit_id_size_dict.items():
-                self.get_disk(disk_id).get_section(obj.tag).recycle_unit(unit_id, size)
+                section = self.get_disk(disk_id).get_section(obj.tag, rep_id)
+                assert section.start_pos <= unit_id <= section.end_pos
+                self.get_disk(disk_id).get_section(obj.tag, rep_id).recycle_unit(unit_id, size)
 
-    # @print_function_time
+    @print_function_time
     def register_requests(self, requests: List[Request]):
         self.work_queue.put(requests)
     
-    # @print_function_time
+    @print_function_time
     def clear_timeout_requests(self):
         if self.work_queue.full():
             timeout_requests: List[Request] = self.work_queue.get()

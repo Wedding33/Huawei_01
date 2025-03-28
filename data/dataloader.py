@@ -1,13 +1,15 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
-from math import ceil
+from typing import List, Dict, Tuple
 from math import ceil
 
 class Data:
-    def __init__(self):
-        file = open('./data/sample_practice.in', 'r')
+    def __init__(self, path, folder):
+        file = open(path, 'r')
         head = file.readline().strip().split()
+
+        self.folder = folder
 
         self.T = int(head[0])     # {T + EXTRA_TIME} timestamps, [1, 86400] = 86400
         self.M = int(head[1])     # {M} tags, [1, 16] = 16
@@ -20,35 +22,50 @@ class Data:
         self.write_list = [list(map(int, file.readline().strip().split())) for _ in range(self.M)]
         self.read_list = [list(map(int, file.readline().strip().split())) for _ in range(self.M)]
 
+        # self.section_map = {
+        #     1: {'tag': [1, 15, 16], 'weight': [1, 1, 1]},
+        #     2: {'tag': [2, 3, 5], 'weight': [1, 1, 1]},
+        #     3: {'tag': [6, 7, 8], 'weight': [1, 1, 1]},
+        #     4: {'tag': [12, 13], 'weight': [1, 1]},
+        #     5: {'tag': [9, 10, 11], 'weight': [1, 1, 1]},
+        #     6: {'tag': [4, 14], 'weight': [1, 1]},
+        # }
+        self.section_map = {
+            1: {'tag': [1, 4], 'weight': [1/3, 1/3]},
+            2: {'tag': [2, 3, 5, 6, 7, 11, 15], 'weight': [1/3, 1/3, 1/3, 2/3, 2/3, 1/3, 1/3]},
+            3: {'tag': [1, 5, 7, 12, 14, 15], 'weight': [1/3, 1/3, 1/3, 2/3, 1/3, 1/3]},
+            4: {'tag': [3, 8, 10, 13, 16], 'weight': [1/3, 1/3, 1/3, 1/3, 1/3]},
+            5: {'tag': [1, 5, 9, 10, 11, 14], 'weight': [1/3, 1/3, 1/3, 1/3, 1/3, 1/3]},
+            6: {'tag': [2, 4, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16], 'weight': [1/3, 1/3, 1/3, 2/3, 1/3, 1/3, 1/3, 1/3, 2/3, 1/3, 1/3, 1/3]},
+            7: {'tag': [2, 3, 16, 4, 9], 'weight': [1/3, 1/3, 1/3, 1/3, 1/3]},
+        }
+        self.inverse_map = dict()
+        for i in range(1, len(self.section_map.keys()) + 1):
+            for tag, w in zip(self.section_map[i]['tag'], self.section_map[i]['weight']):
+                if tag not in self.inverse_map: self.inverse_map[tag] = {i: w}
+                self.inverse_map[tag][i] = w
 
-        self.draw_data = [None] * self.M
+        basic_keys = ['delete', 'write', 'read', 'total']
+        self.raw_data: List[Dict] = [None] * self.M
         for i, (dl, wl, rl) in enumerate(zip(self.del_list, self.write_list, self.read_list)):
-            self.draw_data[i] = {
+            self.raw_data[i] = {
                 'delete': dl, 'write': wl, 'read': rl, 'total': [sum(wl[:j + 1]) - sum(dl[:j + 1]) for j in range(self.slice_num)]
             }
         for i in range(self.M):
-            self.draw_data[i]['ratio'] = [(r / t) for r, t in zip(self.draw_data[i]['read'], self.draw_data[i]['total'])]
-
-        self.draw_data = [None] + self.draw_data
-        self.draw_data[0] = {
-            key: [sum([self.draw_data[j][key][i] for j in range(1, self.M + 1)]) for i in range(self.slice_num)]
-            for key in self.draw_data[1].keys()
+            self.raw_data[i]['ratio'] = [(r / t) for r, t in zip(self.raw_data[i]['read'], self.raw_data[i]['total'])]
+        self.raw_data = [None] + self.raw_data
+        self.raw_data[0] = {
+            key: [sum([self.raw_data[j][key][i] for j in range(1, self.M + 1)]) for i in range(self.slice_num)]
+            for key in basic_keys
         }
 
-        section_map = {
-            1: [1, 15, 16],
-            2: [2, 3, 5],
-            3: [6, 7, 8],
-            4: [12, 13],
-            5: [9, 10, 11],
-            6: [4, 14],
-        }
-        inverse_map = dict()
-        for i in range(1, 7):
-            inverse_map = {**inverse_map, **{j: i for j in section_map[i]}}
+
+        self.mapped_raw_data = []
+
+
 
         # self.statistic = {i: {'id': [], 'size': {}} for i in range(1, self.M + 1)}
-        self.statistic = {i: {'id': [], 'size': {}} for i in range(1, 7)}
+        self.statistic: Dict[int, Dict[str, List]] = {i: {'id': [], 'size': {}} for i in range(1, 8)}
         data = ''.join(file.readlines()).split('TIMESTAMP')[1:]
         data = [d.split('\n')[1:] for d in data]
         for d in data:
@@ -60,18 +77,19 @@ class Data:
                 n_write -= 1
                 info = d[pos].strip().split()
                 obj_id, obj_size, tag = int(info[0]), int(info[1]), int(info[2])
-                tag = inverse_map[tag]
-                self.statistic[tag]['id'].append(obj_id)
-                if obj_size not in self.statistic[tag]['size']:
-                    self.statistic[tag]['size'][obj_size] = 1
-                else:
-                    self.statistic[tag]['size'][obj_size] += 1
+                for sec_id in self.inverse_map[tag]:
+                    weight = self.inverse_map[tag][sec_id]
+                    self.statistic[sec_id]['id'].append(obj_id)
+                    if obj_size not in self.statistic[sec_id]['size']:
+                        self.statistic[sec_id]['size'][obj_size] = weight
+                    else:
+                        self.statistic[sec_id]['size'][obj_size] += weight
                 pos += 1
-        self.statistic_total_size = {i: {'size': {size: self.statistic[i]['size'][size] * size for size in self.statistic[i]['size']} } for i in range(1, 7)}
+        self.statistic_total_size = {i: {'size': {size: self.statistic[i]['size'][size] * size for size in self.statistic[i]['size']} } for i in range(1, 8)}
 
-
+# ... existing code ...
     def show_time_varience(self):
-        draw_data = self.draw_data
+        draw_data = self.raw_data
         num_figures = len(draw_data) // 6 + (1 if len(draw_data) % 6 != 0 else 0)
         for fig_idx in range(num_figures):
             start_idx = fig_idx * 6
@@ -101,7 +119,9 @@ class Data:
                 ax.legend(lines, labels, loc='upper left')
 
             plt.tight_layout()
-            plt.show()
+            # 保存图片
+            plt.savefig(self.folder + f'/time_varience_{fig_idx}.png')
+            # plt.show()
 
         metrics = ['delete', 'write', 'read', 'total', 'ratio']
         types = {'large': {}, 'small': {}}
@@ -123,7 +143,9 @@ class Data:
             plt.ylabel(metric.capitalize())
             plt.legend()
             plt.tight_layout()
-            plt.show()
+            # 保存图片
+            plt.savefig(self.folder + f'/{metric}_time_variance.png')
+            # plt.show()
 
         for metric in metrics:
             # 创建一个空的 DataFrame 用于存储每个数据点
@@ -139,11 +161,13 @@ class Data:
             plt.ylabel(metric.capitalize())
             plt.legend()
             plt.tight_layout()
-            plt.show()
+            # 保存图片
+            plt.savefig(self.folder + f'/{metric}_time_variance_stacked.png')
+            # plt.show()
 
     def show_read_total(self):
-        read_totals = [sum(data['read']) for data in self.draw_data]
-        keys = [f'Data {i + 1}' for i in range(len(self.draw_data))]
+        read_totals = [sum(data['read']) for data in self.raw_data]
+        keys = [f'Data {i + 1}' for i in range(len(self.raw_data))]
 
         # 绘制柱状图
         plt.figure(figsize=(10, 6))
@@ -153,13 +177,15 @@ class Data:
         plt.ylabel('Total Read Amount')
         plt.xticks(rotation=45)
         plt.tight_layout()
-        plt.show()
+        # 保存图片
+        plt.savefig(self.folder + '/read_total.png')
+        # plt.show()
 
     def show_write_total(self):
         # 计算每个 key 的 delete 总量和 total 总量
-        delete_totals = [sum(data['delete']) for data in self.draw_data]
-        total_totals = [data['total'][-1] for data in self.draw_data]
-        keys = [f'Data {i + 1}' for i in range(len(self.draw_data))]
+        delete_totals = [sum(data['delete']) for data in self.raw_data]
+        total_totals = [data['total'][-1] for data in self.raw_data]
+        keys = [f'Data {i + 1}' for i in range(len(self.raw_data))]
 
         # 创建 DataFrame 用于绘图
         df = pd.DataFrame({
@@ -180,7 +206,9 @@ class Data:
         plt.xticks(rotation=45)
         plt.legend()
         plt.tight_layout()
-        plt.show()
+        # 保存图片
+        plt.savefig(self.folder + '/write_total.png')
+        # plt.show()
 
     def show_statistic(self):
         total_sizes, average_sizes = {}, {}
@@ -218,7 +246,9 @@ class Data:
         plt.xticks(rotation=45)
         plt.legend(title='Sizes')
         plt.tight_layout()
-        plt.show()
+        # 保存图片
+        plt.savefig(self.folder + '/size_distribution_by_tag.png')
+        # plt.show()
 
         data = []
         sizes = set()
@@ -249,10 +279,13 @@ class Data:
         plt.xticks(rotation=45)
         plt.legend(title='Tags')
         plt.tight_layout()
-        plt.show()
+        # 保存图片
+        plt.savefig(self.folder + '/tag_distribution_by_size.png')
+        # plt.show()
 
 
-data = Data()
+data = Data('./data/sample_practice.in', './fig/practice')
+# data = Data('./data/sample_official.in', './fig/official')
 # data.show_time_varience()
 # data.show_read_total()
 # data.show_write_total()

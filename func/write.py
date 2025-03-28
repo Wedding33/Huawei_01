@@ -16,16 +16,19 @@ def select_disk_unit_v3(manager: Manager, object: Object):
 
 def select_disk_unit(manager: Manager, object: Object):
     units_list = []
+    count = 0
+    disk_id_list = []
     for i in range(args.N):
         disk_id = (manager.tag_count[object.tag] + i) % args.N + 1
-        units = manager.get_disk(disk_id).get_section(object.tag).find_n_empty_units(object.size)
+        units = manager.get_disk(disk_id).get_section(object.tag, count).find_n_empty_units(object.size)
         if units is None:
             continue
+        count += 1
         units_list.append(units)
         if len(units_list) == REP_NUM:
             manager.tag_count[object.tag] += REP_NUM
             break
-    assert len(units_list) == REP_NUM and all(len(units) == object.size for units in units_list), [[unit.id for unit in units] for units in units_list]
+    assert count == REP_NUM and all(len(units) == object.size for units in units_list), [[unit.id for unit in units] for units in units_list]
     return units_list    # REP_NUM * size
 
 

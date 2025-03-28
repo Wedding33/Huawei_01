@@ -1,10 +1,12 @@
 CONT_READ_TOKENS = [None, 64, 52, 42, 34, 28, 23, 19, 16]
 CONT_N_READ = {token: i for i, token in enumerate(CONT_READ_TOKENS)}
 
-
+CAL_READ_TOKENS_HISTORY = {}
 def cal_read_tokens(pre_token: int, n_read: int, max_token=-1):
     assert n_read > 0
-    global CONT_READ_TOKENS, CONT_N_READ
+    global CONT_READ_TOKENS, CONT_N_READ, CAL_READ_TOKENS_HISTORY
+    if (pre_token, n_read) in CAL_READ_TOKENS_HISTORY:
+        return CAL_READ_TOKENS_HISTORY[(pre_token, n_read, max_token)]
     if pre_token != 16:
         # NOTE: calculate read tokens
         i = CONT_N_READ[pre_token]
@@ -38,6 +40,8 @@ def cal_read_tokens(pre_token: int, n_read: int, max_token=-1):
                 return 16 * n_read, 16, n_read
         return 16 * n_read, 16
 
+for pre_token in CONT_READ_TOKENS:
+    pass
 
 PATH_RESULTS = {}
 def read_and_pass_diff(pre_token: int, n_pass: int, n_read: int):

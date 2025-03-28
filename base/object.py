@@ -1,16 +1,13 @@
 from .config import *
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from func.utils import print_function_time
 
-class Object:
-    ...
 
 class Request:
-    def __init__(self, idx, object: Object):
+    def __init__(self, idx, obj_id, size):
         self.id = idx
-        self.object_id = object.id
-        self.object = object
-        self.size_to_read = object.size
+        self.object_id = obj_id
+        self.size_to_read = size
         self.timestamp = timer.time()
         self.on_going = True
 
@@ -96,10 +93,12 @@ class Object:
     def register_units(self, units_list: List[List[Unit]]):
         # NOTE: units_list: REP_NUM * size
         for units in units_list:
-            self.record['disk'][units[0].disk_id] = [unit.id for unit in units]
+            if 'disk' in DEBUG_INFO:
+                self.record['disk'][units[0].disk_id] = [unit.id for unit in units]
             for i, unit in enumerate(units):
                 unit.register_block(self.blocks[i])
-        self.record['write'].append(timer.time())
+        if 'object' in DEBUG_INFO:
+            self.record['write'].append(timer.time())
 
     def unregister_units(self):
         for block in self.blocks:
@@ -126,15 +125,18 @@ class Object:
             req.deactivate()
         # NOTE: unregister units
         self.unregister_units()
-        self.record['delete'].append(timer.time())
+        if 'object' in DEBUG_INFO:
+            self.record['delete'].append(timer.time())
         return [req.id for req in requests] + self.timeout_requests
     
-    def get_recycle_pos(self) -> Dict[int, Dict[int, int]]:
+    def get_recycle_pos(self) -> Tuple[Dict[int, Dict[int, int]], Dict[int, int]]:
         recycle_pos: Dict[int, Dict[int, int]] = dict()
+        rep_id_dict = dict()
         for block in self.blocks:
-            for unit in block.units:
+            for rep_id, unit in enumerate(block.units):
                 if unit.disk_id not in recycle_pos:
                     recycle_pos[unit.disk_id] = dict()
+                    rep_id_dict[unit.disk_id] = rep_id
                 next_unit = False
                 for start_pos in recycle_pos[unit.disk_id]:
                     if start_pos + recycle_pos[unit.disk_id][start_pos] == unit.id:
@@ -143,12 +145,13 @@ class Object:
                         break
                 if next_unit: continue
                 recycle_pos[unit.disk_id][unit.id] = 1
-        return recycle_pos
+        return recycle_pos, rep_id_dict
 
     def register_request(self, request_id):
         # NOTE: register request
-        request = Request(request_id, self)
+        request = Request(request_id, self.id, self.size)
         for block in self.blocks:
             block.requests[request_id] = request
-        self.record['read'].append(timer.time())
+        if 'object' in DEBUG_INFO:
+            self.record['read'].append(timer.time())
         return request

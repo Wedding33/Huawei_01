@@ -7,7 +7,7 @@ from math import floor
 from func.utils import print_function_time
 
 class SortList(list):
-    def append_ascending(self, item):
+    def append_ascending(self, item: int):
         left, right = 0, len(self) - 1
         while left <= right:
             mid = (left + right) // 2
@@ -22,21 +22,22 @@ class SortList(list):
 
 # TODO
 class Section:   # disk section for picking valuable blocks
-    def __init__(self, idx, start_pos, size, units: List[Unit]):
-        self.id = idx
-        self.start_pos = start_pos
-        self.max_written_pos = start_pos - 1
-        self.section_size = size
-        self.end_pos = start_pos + size - 1
+    def __init__(self, idx: int, start_pos: int, size: int, units: List[Unit]):
+        self.id: int = idx
+        self.start_pos: int = start_pos
+        self.max_written_pos: int = start_pos - 1
+        self.section_size: int = size
+        self.end_pos: int = start_pos + size - 1
 
-        self.data = units
-        self.max_obj_size = MAX_OBJECT_SIZE
-        self.delete_record = {s: SortList() for s in range(1, self.max_obj_size + 1)}
+        self.data: List[Unit] = units
+        self.max_obj_size: int = MAX_OBJECT_SIZE
+        self.delete_record: Dict[int, SortList] = {s: SortList() for s in range(1, self.max_obj_size + 1)}
 
-    def get_unit(self, i: int):
+    def get_unit(self, i: int) -> Unit:
+        assert self.start_pos <= i <= self.end_pos, f'{self.start_pos} <= {i} <= {self.end_pos}'
         return self.data[i - self.start_pos]
 
-    def recycle_unit(self, unit_id, size):
+    def recycle_unit(self, unit_id: int, size: int):
         if size > self.max_obj_size:
             for s in range(self.max_obj_size + 1, size + 1):
                 self.delete_record[s] = []
@@ -48,42 +49,43 @@ class Section:   # disk section for picking valuable blocks
         for unit in units:
             self.max_written_pos = max(self.max_written_pos, unit.id)
 
-    def reuse_n_units(self, n, separate=False):
+    def reuse_n_units(self, n: int, separate: bool = False) -> List[Unit]:
+        # ... existing code ...
         if not separate:
             for size in range(n, self.max_obj_size + 1):  # FIXME: consider the case that size > 5 (NOTE: the size is not too large)
                 if len(self.delete_record[size]) > 0:
-                    start_pos = self.delete_record[size].pop(0)
+                    start_pos: int = self.delete_record[size].pop(0)
                     assert type(start_pos) == int and type(n) == int, f'{start_pos}: {type(start_pos)}, {n}: {type(n)}, {size} -> {self.delete_record[size]}'
-                    units = [self.get_unit(i) for i in range(start_pos, start_pos + n)]
+                    units: List[Unit] = [self.get_unit(i) for i in range(start_pos, start_pos + n)]
                     if size != n:
                         self.delete_record[size - n].append_ascending(start_pos + n)
                     return units
             return None
         else:
-            unit_size = []
-            n_size = n
-            sizes = {s: len(self.delete_record[s]) for s in self.delete_record.keys() if (s < n) and len(self.delete_record[s]) > 0}
+            unit_size: List[int] = []
+            n_size: int = n
+            sizes: Dict[int, int] = {s: len(self.delete_record[s]) for s in self.delete_record.keys() if (s < n) and len(self.delete_record[s]) > 0}
             while (n > 0):
                 if len(sizes.keys()) == 0 or min(sizes.keys()) > n:
                     return None
-                max_size = max([k for k in sizes.keys() if k <= n])
+                max_size: int = max([k for k in sizes.keys() if k <= n])
                 sizes[max_size] -= 1
                 if sizes[max_size] == 0:
                     sizes.pop(max_size)
                 unit_size.append(max_size)
                 n -= max_size
-            units = []
+            units: List[Unit] = []
             for size in unit_size:
                 units.extend(self.reuse_n_units(size, separate=False))
             assert len(units) == n_size, f'{len(units)} vs {n_size}, unit_size={unit_size}, sizes={sizes}'
             return units
 
-    def find_n_empty_units(self, n):
-        units = self.reuse_n_units(n, separate=False)
+    def find_n_empty_units(self, n: int) -> List[Unit]:
+        units: List[Unit] = self.reuse_n_units(n, separate=False)
         if units is not None:
             return units
         if self.max_written_pos + n <= self.end_pos:
-            start_pos = self.max_written_pos + 1
+            start_pos: int = self.max_written_pos + 1
             units = [self.get_unit(i) for i in range(start_pos, start_pos + n)]
             return units
         return self.reuse_n_units(n, separate=True)
@@ -114,8 +116,8 @@ class Disk:
         self.prob = None
         # self.mode = 'scan'
 
-    def get_section(self, tag: int) -> Section: 
-        return self.sections[SECTION_MAP[tag] - 1]
+    def get_section(self, tag: int, rep_id: int) -> Section: 
+        return self.sections[SECTION_MAP[tag][rep_id] - 1]
         
     def get_section_by_uid(self, uid: int) -> Section: 
         i = 0
@@ -217,9 +219,9 @@ class Disk:
         if self.can_jump() and self.point != 1:  # jump to the beginning
             self.tokens_left = 0
             # FIXME:FIXME
-            # pos = self.sections[timer.get_section_id() - 1].start_pos
+            pos = self.sections[timer.get_section_id() - 1].start_pos
             # pos = 1
-            pos = self.get_section(self.prob.choose_tag()).start_pos
+            # pos = self.get_section(self.prob.choose_tag()).start_pos
             self.jump_to(pos)
             return f'j {pos}', 0
         else:
