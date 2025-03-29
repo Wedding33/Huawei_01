@@ -84,9 +84,11 @@ class Data:
             for k in self.statistic_tag:
                 self.statistic_tag[k]['total_size'].append(0 if cnt == 0 else self.statistic_tag[k]['total_size'][-1])
                 self.statistic_tag[k]['request_size'].append(0)
+            # self.statistic_tag['total'] = self.statistic_tag.pop(0)
             for k in self.statistic_sec:
                 self.statistic_sec[k]['total_size'].append(0 if cnt == 0 else self.statistic_sec[k]['total_size'][-1])
                 self.statistic_sec[k]['request_size'].append(0)
+            # self.statistic_sec['total'] = self.statistic_sec.pop(0)
             cnt += 1
 
             n_delete = int(d[0].strip())
@@ -147,7 +149,9 @@ class Data:
             self.statistic_sec[k]['total_score'] = sum(self.statistic_sec[k]['request_size'])
             print(f"section {k}: total score: {self.statistic_sec[k]['total_score']}, max total size: {self.statistic_sec[k]['max_total_size']}, ratio: {self.statistic_sec[k]['total_score'] / self.statistic_sec[k]['max_total_size']}")
         max_score = sum([self.statistic_tag[i]['total_score'] for i in self.statistic_tag])
-        print(f'max score: {max_score}')
+        sum_sec_max_total_size = sum([self.statistic_sec[i]['max_total_size'] for i in self.statistic_sec])
+        print(f"max score: {max_score}, sum of tag max total size: {sum([self.statistic_tag[i]['max_total_size'] for i in self.statistic_tag])}, sum of section max total size: {sum_sec_max_total_size}")
+        print(f"proportion: {[self.statistic_sec[k]['max_total_size'] / sum_sec_max_total_size for k in self.statistic_sec]}")
 
         # self.statistic_total_size = {i: {'size': {size: self.statistic_tag[i]['size'][size] * size for size in self.statistic_tag[i]['size']} } for i in range(1, 8)}
 

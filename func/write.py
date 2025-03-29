@@ -3,15 +3,15 @@ from .utils import *
 
 def select_disk(manager: Manager, object: Object):
     return [(object.id + j) % args.N + 1 for j in range(1, REP_NUM + 1)]
-def select_unit(disk: Disk, size, tag):
-    units = disk.get_section(tag).find_n_empty_units(size)
+def select_unit(disk: Disk, size, tag, rep_id):
+    units = disk.get_section(tag, rep_id).find_n_empty_units(size)
     assert (units is not None) and (len(units) == size)
     return units
 
 # @print_function_time
 def select_disk_unit_v3(manager: Manager, object: Object):
     disks = [manager.get_disk(disk_id) for disk_id in select_disk(manager, object)]
-    units_list = [select_unit(disk, object.size, object.tag) for disk in disks]
+    units_list = [select_unit(disk, object.size, object.tag, i) for i, disk in enumerate(disks)]
     return units_list    # REP_NUM * size
 
 def select_disk_unit(manager: Manager, object: Object):
@@ -24,12 +24,12 @@ def select_disk_unit(manager: Manager, object: Object):
             if disk_id in disk_id_list:
                 continue
             units = manager.get_disk(disk_id).get_section(object.tag, rep_id).find_n_empty_units(object.size)
-            if units is None:
-                continue
-            count += 1
-            disk_id_list.append(disk_id)
-            units_list.append(units)
-            manager.tag_count[object.tag] += 1
+            if units is not None:
+                count += 1
+                disk_id_list.append(disk_id)
+                units_list.append(units)
+                manager.tag_count[object.tag] += 1
+                break
     assert count == REP_NUM and all(len(units) == object.size for units in units_list), [[unit.id for unit in units] for units in units_list]
     return units_list    # REP_NUM * size
 
