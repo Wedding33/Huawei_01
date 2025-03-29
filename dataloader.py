@@ -3,6 +3,7 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 from typing import List, Dict, Tuple
+from base.config import SECTION_MAP, REP_NUM
 from math import ceil
 
 class Data:
@@ -22,6 +23,21 @@ class Data:
         self.del_list = [list(map(int, file.readline().strip().split())) for _ in range(self.M)]
         self.write_list = [list(map(int, file.readline().strip().split())) for _ in range(self.M)]
         self.read_list = [list(map(int, file.readline().strip().split())) for _ in range(self.M)]
+
+
+        basic_keys = ['delete', 'write', 'read', 'total']
+        self.raw_data: List[Dict] = [None] * self.M
+        for i, (dl, wl, rl) in enumerate(zip(self.del_list, self.write_list, self.read_list)):
+            self.raw_data[i] = {
+                'delete': dl, 'write': wl, 'read': rl, 'total': [sum(wl[:j + 1]) - sum(dl[:j + 1]) for j in range(self.slice_num)]
+            }
+        for i in range(self.M):
+            self.raw_data[i]['ratio'] = [(r / t) for r, t in zip(self.raw_data[i]['read'], self.raw_data[i]['total'])]
+        self.raw_data = [None] + self.raw_data
+        self.raw_data[0] = {
+            key: [sum([self.raw_data[j][key][i] for j in range(1, self.M + 1)]) for i in range(self.slice_num)]
+            for key in basic_keys
+        }
 
         # self.section_map = {
         #     1: {'tag': [1, 15, 16], 'weight': [1, 1, 1]},
@@ -45,27 +61,21 @@ class Data:
             for tag, w in zip(self.section_map[i]['tag'], self.section_map[i]['weight']):
                 if tag not in self.inverse_map: self.inverse_map[tag] = {i: w}
                 self.inverse_map[tag][i] = w
+        nums_section = len(self.section_map.keys())
 
-        basic_keys = ['delete', 'write', 'read', 'total']
-        self.raw_data: List[Dict] = [None] * self.M
-        for i, (dl, wl, rl) in enumerate(zip(self.del_list, self.write_list, self.read_list)):
-            self.raw_data[i] = {
-                'delete': dl, 'write': wl, 'read': rl, 'total': [sum(wl[:j + 1]) - sum(dl[:j + 1]) for j in range(self.slice_num)]
-            }
-        for i in range(self.M):
-            self.raw_data[i]['ratio'] = [(r / t) for r, t in zip(self.raw_data[i]['read'], self.raw_data[i]['total'])]
-        self.raw_data = [None] + self.raw_data
-        self.raw_data[0] = {
-            key: [sum([self.raw_data[j][key][i] for j in range(1, self.M + 1)]) for i in range(self.slice_num)]
-            for key in basic_keys
-        }
+        # NOTE: 如果用config的参数就不用改，否则注释这个改上面的参数
+        self.inverse_map = dict()
+        for tag in SECTION_MAP.keys():
+            self.inverse_map[tag] = dict()
+            for sec_id in SECTION_MAP[tag]:
+                if sec_id not in self.inverse_map[tag]: self.inverse_map[tag] = {**self.inverse_map[tag], sec_id: 1 / REP_NUM}
+                else: self.inverse_map[tag][sec_id] += 1 / REP_NUM
 
-        self.mapped_raw_data = []
 
         # self.statistic = {i: {'id': [], 'size': {}} for i in range(1, self.M + 1)}
         self.tag_and_size_of_id = {}
-        self.statistic_tag: Dict[int, Dict[str, List]] = {i: {'count': 0, 'total_size': [], 'request_size': [], 'max_total_size': 0, 'size': {}} for i in range(1, 17)}
-        self.statistic_sec: Dict[int, Dict[str, List]] = {i: {'count': 0, 'total_size': [], 'request_size': [], 'max_total_size': 0, 'size': {}} for i in range(1, 8)}
+        self.statistic_tag: Dict[int, Dict[str, List]] = {i: {'count': 0, 'total_size': [], 'request_size': [], 'max_total_size': 0, 'size': {}, 'total_score': 0} for i in range(1, self.M + 1)}
+        self.statistic_sec: Dict[int, Dict[str, List]] = {i: {'count': 0, 'total_size': [], 'request_size': [], 'max_total_size': 0, 'size': {}, 'total_score': 0} for i in range(1, nums_section + 1)}
         
         data = ''.join(file.readlines()).split('TIMESTAMP')[1:]
         data = [d.split('\n')[1:] for d in data]
@@ -87,7 +97,7 @@ class Data:
                 self.statistic_tag[tag]['size'][size] -= 1
                 self.statistic_tag[tag]['total_size'][-1] -= size
                 for sec_id in self.inverse_map[tag]:
-                    weight = self.inverse_map[tag][sec_id]
+                    weight = self.inverse_map[tag][sec_id] * REP_NUM
                     self.statistic_sec[sec_id]['count'] -= weight
                     self.statistic_sec[sec_id]['size'][size] -= weight
                     self.statistic_sec[sec_id]['total_size'][-1] -= weight * size
@@ -108,7 +118,7 @@ class Data:
                 self.statistic_tag[tag]['count'] += 1
                 self.statistic_tag[tag]['max_total_size'] = max(self.statistic_tag[tag]['max_total_size'], self.statistic_tag[tag]['total_size'][-1])
                 for sec_id in self.inverse_map[tag]:
-                    weight = self.inverse_map[tag][sec_id]
+                    weight = self.inverse_map[tag][sec_id] * REP_NUM
                     # self.statistic[sec_id]['id'].append(obj_id)
                     if obj_size not in self.statistic_sec[sec_id]['size']:
                         self.statistic_sec[sec_id]['size'][obj_size] = weight
@@ -130,8 +140,16 @@ class Data:
                     # self.statistic[sec_id]['id'].append(obj_id)
                     self.statistic_sec[sec_id]['request_size'][-1] += (size + 1) * 0.5 * weight
 
+        for k in self.statistic_tag:
+            self.statistic_tag[k]['total_score'] = sum(self.statistic_tag[k]['request_size'])
+            print(f"tag {k}: total score: {self.statistic_tag[k]['total_score']}, max total size: {self.statistic_tag[k]['max_total_size']}, ratio: {self.statistic_tag[k]['total_score'] / self.statistic_tag[k]['max_total_size']}")
+        for k in self.statistic_sec:
+            self.statistic_sec[k]['total_score'] = sum(self.statistic_sec[k]['request_size'])
+            print(f"section {k}: total score: {self.statistic_sec[k]['total_score']}, max total size: {self.statistic_sec[k]['max_total_size']}, ratio: {self.statistic_sec[k]['total_score'] / self.statistic_sec[k]['max_total_size']}")
+        max_score = sum([self.statistic_tag[i]['total_score'] for i in self.statistic_tag])
+        print(f'max score: {max_score}')
 
-        self.statistic_total_size = {i: {'size': {size: self.statistic_tag[i]['size'][size] * size for size in self.statistic_tag[i]['size']} } for i in range(1, 8)}
+        # self.statistic_total_size = {i: {'size': {size: self.statistic_tag[i]['size'][size] * size for size in self.statistic_tag[i]['size']} } for i in range(1, 8)}
 
 
     def show_statistic_trends(self, data, rows=2, cols=3, move_average_obj=10, move_average_req=100, notation='tag'):
@@ -177,7 +195,7 @@ class Data:
             plt.tight_layout()
             # 保存图片
             plt.savefig(self.folder + f'/statistic_{notation}_trends_{fig_idx}.png')
-            plt.show()
+            # plt.show()
 
     def show_statistic_tag_and_sec_trends(self, move_average_obj=10, move_average_req=100):
         self.show_statistic_trends(self.statistic_tag, rows=2, cols=4, move_average_obj=move_average_obj, move_average_req=move_average_req, notation='tag')
@@ -382,6 +400,7 @@ class Data:
 
 
 # data = Data('./data/sample_practice.in', './fig/practice')
+# data = Data('./data/practice.in', './fig/practice_all')
 data = Data('./data/sample_official.in', './fig/official')
 # data.show_time_varience()
 # data.show_read_total()
