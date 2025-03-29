@@ -30,7 +30,23 @@ def select_disk_unit(manager: Manager, object: Object):
                 units_list.append(units)
                 manager.tag_count[object.tag] += 1
                 break
-    assert count == REP_NUM and all(len(units) == object.size for units in units_list), [[unit.id for unit in units] for units in units_list]
+        if count < rep_id + 1:
+            for i in range(args.N):
+                disk_id = (manager.tag_count[object.tag] + i) % args.N + 1
+                if disk_id in disk_id_list:
+                    continue
+                for sec in manager.get_disk(disk_id).get_sections():
+                    units = sec.find_n_empty_units(object.size)
+                    if units is not None:
+                        count += 1
+                        disk_id_list.append(disk_id)
+                        units_list.append(units)
+                        manager.tag_count[object.tag] += 1
+                        manager.overflow_count += object.size
+                        break
+                if count == rep_id + 1: break
+            assert count == rep_id + 1, [[unit.id for unit in units] for units in units_list]
+    assert all(len(units) == object.size for units in units_list), [[unit.id for unit in units] for units in units_list]
     return units_list    # REP_NUM * size
 
 

@@ -118,7 +118,10 @@ class Disk:
 
     def get_section(self, tag: int, rep_id: int) -> Section: 
         return self.sections[SECTION_MAP[tag][rep_id] - 1]
-        
+    
+    def get_sections(self) -> List[Section]:
+        return self.sections
+    
     def get_section_by_uid(self, uid: int) -> Section: 
         i = 0
         while i < len(self.sections_start_pos) and self.sections_start_pos[i] <= uid:

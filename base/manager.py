@@ -16,7 +16,7 @@ class Manager:
         # FIXME: add effective requests queue
         self.timestamp = 0
         self.tag_count = {i: 0 for i in range(1, args.M + 1)}
-
+        self.overflow_count = 0
 
         # auxiliary data
     def get_disk(self, i: int) -> Disk:
@@ -36,9 +36,11 @@ class Manager:
         disk_unit_dict, rep_id_dict = obj.get_recycle_pos()
         for rep_id, (disk_id, unit_id_size_dict) in zip(rep_id_dict.values(), disk_unit_dict.items()):
             for unit_id, size in unit_id_size_dict.items():
+                # FIXME: faster but more complex
                 section = self.get_disk(disk_id).get_section(obj.tag, rep_id)
-                assert section.start_pos <= unit_id <= section.end_pos
-                self.get_disk(disk_id).get_section(obj.tag, rep_id).recycle_unit(unit_id, size)
+                if not section.start_pos <= unit_id <= section.end_pos:
+                    section = self.get_disk(disk_id).get_section_by_uid(unit_id)
+                section.recycle_unit(unit_id, size)
 
     @print_function_time
     def register_requests(self, requests: List[Request]):

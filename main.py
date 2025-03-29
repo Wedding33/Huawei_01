@@ -32,4 +32,6 @@ if __name__ == '__main__':
         if DEBUG_TIMESTAMP is not None:
             assert timer.time() != DEBUG_TIMESTAMP
         
+    with open(OTHER_OUTPUT_PATH, 'a') as f:
+        print(f"overflow_count: {manager.overflow_count}", file=f)
 

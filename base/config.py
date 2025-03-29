@@ -104,7 +104,7 @@ class Timer:
     def get_section_id(self):
         idx = self.timestamp / FRE_PER_SLICING
         sec_id = 1
-        while self.section_timestamp_start[sec_id] <= idx:
+        while sec_id < len(self.section_timestamp_start) and self.section_timestamp_start[sec_id] <= idx:
             sec_id += 1
         return sec_id
         
