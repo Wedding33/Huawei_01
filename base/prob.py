@@ -1,5 +1,5 @@
 import random
-from .config import args, timer
+from .config import args, timer, OTHER_OUTPUT_PATH
 
 def linear(arr, t):
     length = len(arr)
@@ -17,10 +17,12 @@ def linear(arr, t):
 
 
 class Prob:
-    def __init__(self, obj_num_list, read_list):
+    def __init__(self, obj_num_list, read_list, sec_obj_num_list, sec_read_list):
         # NOTE: both are (M * (num_slice + 1))
         self.obj_num_list = obj_num_list
         self.read_list = read_list
+        self.sec_obj_num_list = sec_obj_num_list
+        self.sec_read_list = sec_read_list
 
     # TODO:FIXME: maintain a req & obj counts list
     def choose_tag(self):
@@ -32,4 +34,15 @@ class Prob:
         ratios = [req_num / obj_num for req_num, obj_num in zip(req_nums, obj_nums)]
         ratios = [ratio / sum(ratios) for ratio in ratios]
         return random.choices(list(range(1, args.M + 1)), weights=ratios)[0]
+    
+    def choose_section(self):
+        # TODO: FIXME: consider object size
+        t = timer.time_phase()
+    
+        obj_nums = [linear(obj_num_t, t) for obj_num_t in self.sec_obj_num_list]
+        req_nums = [linear(req_num_t, t) for req_num_t in self.sec_read_list]
+
+        ratios = [req_num / obj_num for req_num, obj_num in zip(req_nums, obj_nums)]
+        ratios = [ratio / sum(ratios) for ratio in ratios]
+        return random.choices(list(range(1, len(ratios) + 1)), weights=ratios)[0]
 

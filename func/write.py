@@ -23,7 +23,8 @@ def select_disk_unit(manager: Manager, object: Object):
             disk_id = (manager.tag_count[object.tag] + i) % args.N + 1
             if disk_id in disk_id_list:
                 continue
-            units = manager.get_disk(disk_id).get_section(object.tag, rep_id).find_n_empty_units(object.size)
+            section = manager.get_disk(disk_id).get_section(object.tag, rep_id)
+            units = section.find_n_empty_units(object.size)
             if units is not None:
                 count += 1
                 disk_id_list.append(disk_id)
@@ -47,7 +48,7 @@ def select_disk_unit(manager: Manager, object: Object):
                 if count == rep_id + 1: break
             assert count == rep_id + 1, [[unit.id for unit in units] for units in units_list]
     assert all(len(units) == object.size for units in units_list), [[unit.id for unit in units] for units in units_list]
-    return units_list    # REP_NUM * size
+    return disk_id_list, units_list    # REP_NUM * size
 
 
 # @print_function_time
@@ -71,10 +72,10 @@ def write_action(manager: Manager):
         tag = int(write_input[2])
         object = Object(object_id, size, tag)
 
-        units_list = select_disk_unit(manager, object)
+        disk_id_list, units_list = select_disk_unit(manager, object)
         # units_list = select_disk_unit_v3(manager, object)
 
-        object.register_units(units_list)
+        object.register_units(disk_id_list, units_list)
         manager.register_object_and_disk(object, units_list)
         
         if any(info in DEBUG_INFO for info in ["object", "disk"]) and DEBUG_TIMESTAMP in [None, timer.time()]:

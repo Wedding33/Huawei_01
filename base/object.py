@@ -85,18 +85,21 @@ class Object:
         self.id = object_id
         self.size = size
         self.blocks = [Block(object_id) for _ in range(size)]
+        self.section_id_map = {}
         self.tag = tag
         self.timeout_requests = []
 
         self.record: Dict[str, List] = {'write': [], 'delete': [], 'read': [], 'disk': {}}
 
-    def register_units(self, units_list: List[List[Unit]]):
+    def register_units(self, disk_id_list: List[int], units_list: List[List[Unit]]):
         # NOTE: units_list: REP_NUM * size
         for units in units_list:
             if 'disk' in DEBUG_INFO:
                 self.record['disk'][units[0].disk_id] = [unit.id for unit in units]
             for i, unit in enumerate(units):
                 unit.register_block(self.blocks[i])
+        # FIXME:FIXME
+        # self.section_id_map = {disk_id: unit.section_id for disk_id in disk_id_list}
         if 'object' in DEBUG_INFO:
             self.record['write'].append(timer.time())
 

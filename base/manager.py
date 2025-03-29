@@ -43,9 +43,9 @@ class Manager:
                 section.recycle_unit(unit_id, size)
 
     @print_function_time
-    def register_requests(self, requests: List[Request]):
+    def register_requests(self, requests: List[Request], objects: List[Object]):
         self.work_queue.put(requests)
-    
+
     @print_function_time
     def clear_timeout_requests(self):
         if self.work_queue.full():
@@ -60,8 +60,8 @@ class Manager:
             disk = self.get_disk(units[0].disk_id)
             disk.register_max_written_pos(units)
 
-    def register_prob(self, obj_num_list, read_list):
-        prob = Prob(obj_num_list, read_list)
+    def register_prob(self, obj_num_list, read_list, sec_obj_num_list, sec_read_list):
+        prob = Prob(obj_num_list, read_list, sec_obj_num_list, sec_read_list)
         for disk in self.disks:
             disk.register_prob(prob)
 

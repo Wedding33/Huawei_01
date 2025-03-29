@@ -31,7 +31,7 @@ def read_action(manager: Manager):
             requests[i] = objs[i].register_request(req_ids[i])
     input_request()
     collect_request()
-    manager.register_requests(requests)
+    manager.register_requests(requests, objs)
 
     if any(info in DEBUG_INFO for info in ["object", "disk"]) and DEBUG_TIMESTAMP in [None, timer.time()]:
         manager.print_debug_info()
