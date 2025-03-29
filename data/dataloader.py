@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
 import pandas as pd
 from typing import List, Dict, Tuple
 from math import ceil
@@ -59,17 +60,38 @@ class Data:
             for key in basic_keys
         }
 
-
         self.mapped_raw_data = []
 
-
-
         # self.statistic = {i: {'id': [], 'size': {}} for i in range(1, self.M + 1)}
-        self.statistic: Dict[int, Dict[str, List]] = {i: {'id': [], 'size': {}} for i in range(1, 8)}
+        self.tag_and_size_of_id = {}
+        self.statistic_tag: Dict[int, Dict[str, List]] = {i: {'count': 0, 'total_size': [], 'request_size': [], 'max_total_size': 0, 'size': {}} for i in range(1, 17)}
+        self.statistic_sec: Dict[int, Dict[str, List]] = {i: {'count': 0, 'total_size': [], 'request_size': [], 'max_total_size': 0, 'size': {}} for i in range(1, 8)}
+        
         data = ''.join(file.readlines()).split('TIMESTAMP')[1:]
         data = [d.split('\n')[1:] for d in data]
+        cnt = 0
         for d in data:
+            for k in self.statistic_tag:
+                self.statistic_tag[k]['total_size'].append(0 if cnt == 0 else self.statistic_tag[k]['total_size'][-1])
+                self.statistic_tag[k]['request_size'].append(0)
+            for k in self.statistic_sec:
+                self.statistic_sec[k]['total_size'].append(0 if cnt == 0 else self.statistic_sec[k]['total_size'][-1])
+                self.statistic_sec[k]['request_size'].append(0)
+            cnt += 1
+
             n_delete = int(d[0].strip())
+            for i in range(n_delete):
+                obj_id = int(d[i + 1].strip().split()[0])
+                tag, size = self.tag_and_size_of_id[obj_id]
+                self.statistic_tag[tag]['count'] -= 1
+                self.statistic_tag[tag]['size'][size] -= 1
+                self.statistic_tag[tag]['total_size'][-1] -= size
+                for sec_id in self.inverse_map[tag]:
+                    weight = self.inverse_map[tag][sec_id]
+                    self.statistic_sec[sec_id]['count'] -= weight
+                    self.statistic_sec[sec_id]['size'][size] -= weight
+                    self.statistic_sec[sec_id]['total_size'][-1] -= weight * size
+
             pos_n_write = 1 + n_delete
             n_write = int(d[pos_n_write].strip())
             pos = 1 + pos_n_write
@@ -77,15 +99,90 @@ class Data:
                 n_write -= 1
                 info = d[pos].strip().split()
                 obj_id, obj_size, tag = int(info[0]), int(info[1]), int(info[2])
+                self.tag_and_size_of_id[obj_id] = (tag, obj_size)
+                if obj_size not in self.statistic_tag[tag]['size']:
+                    self.statistic_tag[tag]['size'][obj_size] = 1
+                else:
+                    self.statistic_tag[tag]['size'][obj_size] += 1
+                self.statistic_tag[tag]['total_size'][-1] += obj_size
+                self.statistic_tag[tag]['count'] += 1
+                self.statistic_tag[tag]['max_total_size'] = max(self.statistic_tag[tag]['max_total_size'], self.statistic_tag[tag]['total_size'][-1])
                 for sec_id in self.inverse_map[tag]:
                     weight = self.inverse_map[tag][sec_id]
-                    self.statistic[sec_id]['id'].append(obj_id)
-                    if obj_size not in self.statistic[sec_id]['size']:
-                        self.statistic[sec_id]['size'][obj_size] = weight
+                    # self.statistic[sec_id]['id'].append(obj_id)
+                    if obj_size not in self.statistic_sec[sec_id]['size']:
+                        self.statistic_sec[sec_id]['size'][obj_size] = weight
                     else:
-                        self.statistic[sec_id]['size'][obj_size] += weight
+                        self.statistic_sec[sec_id]['size'][obj_size] += weight
+                    self.statistic_sec[sec_id]['count'] += weight
+                    self.statistic_sec[sec_id]['total_size'][-1] += weight * obj_size
+                    self.statistic_sec[sec_id]['max_total_size'] = max(self.statistic_sec[sec_id]['max_total_size'], self.statistic_sec[sec_id]['total_size'][-1])
                 pos += 1
-        self.statistic_total_size = {i: {'size': {size: self.statistic[i]['size'][size] * size for size in self.statistic[i]['size']} } for i in range(1, 8)}
+
+            n_read = int(d[pos].strip().split()[0])
+            for i in range(n_read):
+                info = d[pos + i + 1].strip().split()
+                req_id, obj_id = int(info[0]), int(info[1])
+                tag, size = self.tag_and_size_of_id[obj_id]
+                self.statistic_tag[tag]['request_size'][-1] += (size + 1) * 0.5
+                for sec_id in self.inverse_map[tag]:
+                    weight = self.inverse_map[tag][sec_id]
+                    # self.statistic[sec_id]['id'].append(obj_id)
+                    self.statistic_sec[sec_id]['request_size'][-1] += (size + 1) * 0.5 * weight
+
+
+        self.statistic_total_size = {i: {'size': {size: self.statistic_tag[i]['size'][size] * size for size in self.statistic_tag[i]['size']} } for i in range(1, 8)}
+
+
+    def show_statistic_trends(self, data, rows=2, cols=3, move_average_obj=10, move_average_req=100, notation='tag'):
+        num_tags = len(data)
+        figures_per_page = rows * cols
+        num_figures = num_tags // figures_per_page + (1 if num_tags % figures_per_page != 0 else 0)
+
+        for fig_idx in range(num_figures):
+            start_idx = fig_idx * figures_per_page
+            end_idx = min(start_idx + figures_per_page, num_tags)
+            fig, axes = plt.subplots(rows, cols, figsize=(15, 10))
+            axes = axes.flatten()
+
+            for i in range(start_idx, end_idx):
+                tag = i + 1
+                ax = axes[i - start_idx]
+
+                # 计算移动平均
+                total_size = np.array(data[tag]['total_size'])
+                request_size = np.array(data[tag]['request_size'])
+                total_size_ma = np.convolve(total_size, np.ones(move_average_obj)/move_average_obj, mode='valid')
+                request_size_ma = np.convolve(request_size, np.ones(move_average_req)/move_average_req, mode='valid')
+
+                # 绘制 total_size 到第一个坐标轴
+                line1, = ax.plot(total_size_ma, label='Total Size (MA)', color='blue')
+                ax.set_ylabel('Total Size', color='blue')
+                ax.tick_params(axis='y', labelcolor='blue')
+                ax.set_title(f'{notation} {tag} Trends')
+                ax.set_xlabel('Time')
+
+                # 创建第二个坐标轴
+                ax2 = ax.twinx()
+                # 绘制 request_size 到第二个坐标轴
+                line2, = ax2.plot(request_size_ma, label='Request Size (MA)', color='red')
+                ax2.set_ylabel('Request Size', color='red')
+                ax2.tick_params(axis='y', labelcolor='red')
+
+                # 合并两个坐标轴的图例
+                lines = [line1, line2]
+                labels = [l.get_label() for l in lines]
+                ax.legend(lines, labels, loc='upper left')
+
+            plt.tight_layout()
+            # 保存图片
+            plt.savefig(self.folder + f'/statistic_{notation}_trends_{fig_idx}.png')
+            plt.show()
+
+    def show_statistic_tag_and_sec_trends(self, move_average_obj=10, move_average_req=100):
+        self.show_statistic_trends(self.statistic_tag, rows=2, cols=4, move_average_obj=move_average_obj, move_average_req=move_average_req, notation='tag')
+        self.show_statistic_trends(self.statistic_sec, rows=2, cols=4, move_average_obj=move_average_obj, move_average_req=move_average_req, notation='sec')
+
 
 # ... existing code ...
     def show_time_varience(self):
@@ -284,9 +381,10 @@ class Data:
         # plt.show()
 
 
-data = Data('./data/sample_practice.in', './fig/practice')
-# data = Data('./data/sample_official.in', './fig/official')
+# data = Data('./data/sample_practice.in', './fig/practice')
+data = Data('./data/sample_official.in', './fig/official')
 # data.show_time_varience()
 # data.show_read_total()
 # data.show_write_total()
-data.show_statistic()
+# data.show_statistic()
+data.show_statistic_tag_and_sec_trends()
